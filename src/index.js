@@ -1,4 +1,4 @@
-rules_version = '2';
+rules_version = '2';    
 
 service firebase.storage {
   match /b/{bucket}/o {
@@ -18,6 +18,7 @@ service firebase.storage {
         && request.resource.contentType.matches('image/.*');
       allow delete: if isOwner(uid);
     }
+    
 
     match /courseAssets/{courseId}/{fileName} {
       allow read: if signedIn();
