@@ -1,4 +1,100 @@
-{
-  "indexes": [],
-  "fieldOverrides": []
+import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc } from 'firebase/firestore';
+import { firestore } from './firebase';
+import { FIRESTORE_COLLECTIONS } from './firestoreCollections';
+
+function requireFirestore() {
+  if (!firestore) {
+    throw new Error('Firebase is not configured. Please provide Expo Firebase environment variables.');
+  }
+}
+
+export async function fetchCourses() {
+  requireFirestore();
+  const snapshot = await getDocs(collection(firestore, FIRESTORE_COLLECTIONS.courses));
+  const courses = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+  return courses.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+
+export async function fetchSafetyTips() {
+  requireFirestore();
+  const snapshot = await getDocs(collection(firestore, FIRESTORE_COLLECTIONS.safetyTips));
+  const tips = snapshot.docs
+    .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const uniqueByTitle = new Map();
+
+  tips.forEach((tip) => {
+    const titleKey = String(tip.title || tip.id).trim().toLowerCase();
+    const existing = uniqueByTitle.get(titleKey);
+    const tipHasSources = Array.isArray(tip.sources) && tip.sources.length > 0;
+    const existingHasSources = Array.isArray(existing?.sources) && existing.sources.length > 0;
+
+    if (!existing || (tipHasSources && !existingHasSources)) {
+      uniqueByTitle.set(titleKey, tip);
+    }
+  });
+
+  return Array.from(uniqueByTitle.values()).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+
+export async function fetchCourseProgress(uid) {
+  requireFirestore();
+  if (!uid) {
+    return { uid: '', courses: {} };
+  }
+
+  const progressRef = doc(firestore, FIRESTORE_COLLECTIONS.courseProgress, uid);
+  const progressSnap = await getDoc(progressRef);
+  if (!progressSnap.exists()) {
+    return { uid, courses: {} };
+  }
+  return progressSnap.data();
+}
+
+export async function saveCourseProgress(uid, progressData) {
+  requireFirestore();
+  if (!uid) {
+    throw new Error('Missing user UID for course progress save.');
+  }
+
+  const progressRef = doc(firestore, FIRESTORE_COLLECTIONS.courseProgress, uid);
+  await setDoc(
+    progressRef,
+    {
+      uid,
+      updatedAt: serverTimestamp(),
+      courses: progressData,
+    },
+    { merge: true }
+  );
+}
+
+export function mergeCourseProgress(courses, progressDoc) {
+  const progressByCourse = (progressDoc?.courses || {});
+
+  return courses.map((course) => {
+    const savedCourse = progressByCourse[course.id] || {};
+    const completedTitles = Array.isArray(savedCourse.completedLessonTitles) ? savedCourse.completedLessonTitles : [];
+    const quizScores = savedCourse.quizScores || {};
+    const lessonsSource = Array.isArray(course.lessons) ? course.lessons : [];
+
+    const lessons = lessonsSource.map((lesson) => {
+      const savedScore = quizScores[lesson.title];
+      return {
+        ...lesson,
+        completed: completedTitles.includes(lesson.title),
+        ...(lesson.assessment && typeof savedScore === 'number' ? { savedScore } : {}),
+      };
+    });
+
+    const completedLessons = lessons.filter((lesson) => lesson.completed).length;
+    const progress = lessons.length ? Math.round((completedLessons / lessons.length) * 100) : 0;
+
+    return {
+      ...course,
+      lessons,
+      completedLessons,
+      progress,
+    };
+  });
 }
