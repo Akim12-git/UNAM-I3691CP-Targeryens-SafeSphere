@@ -1,4 +1,15 @@
-{
-  "indexes": [],
-  "fieldOverrides": []
-}
+export const FIRESTORE_COLLECTIONS = {
+  users: 'users',
+  usernameIndex: 'usernameIndex',
+  courseProgress: 'courseProgress',
+  quizAttempts: 'quizAttempts',
+  certificates: 'certificates',
+  courses: 'courses',
+  safetyTips: 'safetyTips',
+};
+
+export const FIRESTORE_SUBCOLLECTIONS = {
+  progressCourses: 'courses',
+  quizAttempts: 'attempts',
+  certificates: 'items',
+};
