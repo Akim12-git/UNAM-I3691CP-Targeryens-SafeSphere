@@ -20,11 +20,13 @@ compilerOptions": {
       ]
     }
   },
+
   "include": [
     "src/**/*",
     "App.js",
     "index.js"
   ],
+
   "exclude": [
     "node_modules",
     "**/__tests__/*",
@@ -32,6 +34,7 @@ compilerOptions": {
     "dist",
     "build"
   ],
+
   "extends": "expo/tsconfig.base"
 }
 
